@@ -10,15 +10,14 @@ load_dotenv()
 count = 0
 msg_author = None
 
+
 @bot.event
 async def on_message(message):
     global count
     global msg_author
     global channel_id
     channel_id = os.getenv('CHANNEL_ID')
-    print(channel_id)
     if str(message.channel.id) == channel_id:  # replace with your specific channel id
-        print("good channel")
         try:
             user_count = int(message.content)
             if user_count == count + 1 and msg_author != message.author:
