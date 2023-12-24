@@ -1,7 +1,11 @@
 import discord
+import os
 from discord.ext import commands
+from dotenv import load_dotenv
+
 intents = discord.Intents.all()
 bot = commands.Bot(command_prefix='!', intents=intents)
+load_dotenv()
 
 count = 0
 
@@ -28,7 +32,10 @@ async def on_message(message):
 
 # function to start the bot
 def start_bot():
-    bot.run('MTE4ODUyODkzNjI5NzE4NTM3Mg.GXhY_J.a_IbsD8OQcZXeoIxWexWdXhs0PzSFezJE1PcmQ')  # replace with your bot token
+    bot_token = os.getenv('BOT_TOKEN')
+    if not bot_token:
+        raise Exception("BOT_TOKEN is not set in environment variables")
+    bot.run(bot_token)
 
 
 # main function to execute the program
