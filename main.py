@@ -8,27 +8,36 @@ bot = commands.Bot(command_prefix='!', intents=intents)
 load_dotenv()
 
 count = 0
-
+msg_author = None
 
 @bot.event
 async def on_message(message):
     global count
-    print("message received : " + message.content)
-    print("in channel : " + str(message.channel.id))
-    if message.channel.id == 984489193457729548:  # replace with your specific channel id
-        print("OUAIS")
+    global msg_author
+    global channel_id
+    channel_id = os.getenv('CHANNEL_ID')
+    print(channel_id)
+    if str(message.channel.id) == channel_id:  # replace with your specific channel id
+        print("good channel")
         try:
             user_count = int(message.content)
-            if user_count == count + 1:
+            if user_count == count + 1 and msg_author != message.author:
                 count += 1
-                await message.channel.send('Count valid')  # message when count is valid
+                msg_author = message.author
+                await message.add_reaction('\u2705')  # Checkmark reaction represents validation
+                print("Count " + str(count) + " reached by " + str(msg_author))
             else:
+                if msg_author == message.author:
+                    await message.channel.send('Count reset to 0 due multiple tries in a row.')
+                    print("Count reseted by " + str(msg_author) + " due to multiple tries in a row.")
+                else:
+                    await message.channel.send('Count reset to 0 due to incorrect sequence.')
+                    print("Count reseted by " + str(msg_author) + " due to incorrect sequence.")
                 count = 0
-                await message.channel.send('Count reset to 0 due to incorrect sequence.')
+                msg_author = None
         except ValueError:
             pass  # not a number
     await bot.process_commands(message)
-
 
 
 # function to start the bot
