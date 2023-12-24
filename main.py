@@ -30,6 +30,7 @@ async def on_message(message):
     await bot.process_commands(message)
 
 
+
 # function to start the bot
 def start_bot():
     bot_token = os.getenv('BOT_TOKEN')
