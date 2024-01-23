@@ -89,7 +89,7 @@ async def on_message(message):
                 end_date = datetime.now()
 
                 # Updated line to set end_date to current time when run is finished
-                mycursor.execute("UPDATE scores SET status = %s, end_date = %s, shame = %s WHERE status = 'running'", ('finished', end_date, message.author))
+                mycursor.execute("UPDATE scores SET status = %s, end_date = %s, shame = %s WHERE status = 'running'", ('finished', end_date, str(message.author)))
                 mydb.commit()
                 print("Run finished, creating a new run...")
                 create_new_run()
