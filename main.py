@@ -76,20 +76,20 @@ async def on_message(message):
             else:
                 if msg_author == message.author:
                     embed = discord.Embed(title="**Error!**", colour=0xFF0000)
+                    embed.set_image(url="https://media1.tenor.com/m/ormtsnMh2RgAAAAC/you-youre.gif")
                     embed.add_field(name="Reason", value=f"Count reset to 0 due multiple tries in a row by {str(message.author)}", inline=False)
                     await message.channel.send(embed=embed)
                     print("Count reseted by " + str(message.author) + " due to multiple tries in a row.")
                 else:
                     embed = discord.Embed(title="**Error!**", colour=0xFF0000)
+                    embed.set_image(url="https://media1.tenor.com/m/ormtsnMh2RgAAAAC/you-youre.gif")
                     embed.add_field(name="Reason", value=f"Count reset to 0 due to incorrect sequence by {str(message.author)}", inline=False)
                     await message.channel.send(embed=embed)
                     print("Count reseted by " + str(message.author) + " due to incorrect sequence.")
-                count = 0
-                msg_author = None
                 end_date = datetime.now()
 
                 # Updated line to set end_date to current time when run is finished
-                mycursor.execute("UPDATE scores SET status = %s, end_date = %s WHERE status = 'running'", ('finished', end_date))
+                mycursor.execute("UPDATE scores SET status = %s, end_date = %s, shame = %s WHERE status = 'running'", ('finished', end_date, message.author))
                 mydb.commit()
                 print("Run finished, creating a new run...")
                 create_new_run()
@@ -106,8 +106,8 @@ async def leaderboard(ctx):
     top_scores = mycursor.fetchall()
     embed = discord.Embed(title="Top 5 leaderboard", description="Top 5 best runs:", color=0x0080ff)
     for i, score in enumerate(top_scores, start=1):
-        embed.add_field(name=f"Top {i} : {score[0]}", value=f"Scored `{score[0]}` points starting on `{score[1]}` and ended on `{score[2]}`, participants were {score[4]}.", inline=False)
-        embed.set_field_at(i-1, name=f"Top {i} : {score[0]}", value=f"Scored **{score[0]}** points starting on `{score[1]}` and ended on `{score[2]}`, participants were {score[4]}.", inline=False)
+        embed.add_field(name=f"Top {i} : {score[0]}", value=f"Scored `{score[0]}` points starting on `{score[1]}` and ended on `{score[2]}`, participants were `{score[4][2:]}`, failed by `{score[5]}`.", inline=False)
+        embed.set_field_at(i-1, name=f"Top {i} : {score[0]}", value=f"Scored **{score[0]}** points starting on `{score[1]}` and ended on `{score[2]}`, participants were `{score[4][2:]}`, failed by `{score[5]}`.", inline=False)
     await ctx.send(embed=embed)
 
 # function to start the bot
