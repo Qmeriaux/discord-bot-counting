@@ -110,6 +110,25 @@ async def leaderboard(ctx):
         embed.set_field_at(i-1, name=f"Top {i} : {score[0]}", value=f"Scored **{score[0]}** points starting on `{score[1]}` and ended on `{score[2]}`, participants were `{score[4][2:]}`, failed by `{score[5]}`.", inline=False)
     await ctx.send(embed=embed)
 
+@bot.command(name='hallofshame')
+async def hallofshame(ctx):
+    mycursor.execute("SELECT shame, COUNT(*) as Count FROM scores WHERE status = 'finished' GROUP BY shame ORDER BY Count DESC LIMIT 5")
+    shame_list = mycursor.fetchall()
+    embed = discord.Embed(title="Hall of Shame", description="Top 5 with most fails:", color=0xFF0000)
+    for i, shame in enumerate(shame_list, start=1):
+        embed.add_field(name=f"Top {i} : {shame[0]}", value=f"Failed `{shame[1]}` times.", inline=False)
+    await ctx.send(embed=embed)
+
+@bot.command(name='changelog')
+async def changelog(ctx):
+    embed = discord.Embed(title="Changelog", description="Changes made in this version:", color=0x0080ff)
+    embed.add_field(name="Version 2.3", value="- Added Hall of Shame", inline=False)
+    embed.add_field(name="Version 2.2", value="- Changed errors messages", inline=False)
+    embed.add_field(name="Version 2.1", value="- Bug fixes", inline=False)
+    embed.add_field(name="Version 2.0", value="- Added database connection\n- Added leaderboard", inline=False)
+    embed.add_field(name="Version 1.0", value="- Initial release\n- Basic counting system", inline=False)
+    await ctx.send(embed=embed)
+
 # function to start the bot
 def start_bot():
     bot_token = os.getenv('BOT_TOKEN')
