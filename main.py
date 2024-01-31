@@ -1,7 +1,9 @@
+import asyncio
+import os
+import time
 from datetime import datetime
 
 import discord
-import os
 import mysql.connector
 from discord.ext import commands
 from dotenv import load_dotenv
@@ -13,15 +15,43 @@ load_dotenv()
 count = 0
 msg_author = None
 
+
 # MySQL connection
-mydb = mysql.connector.connect(
-  host=os.getenv('DB_HOST'),
-  user=os.getenv('DB_USER'),
-  password=os.getenv('DB_PASSWORD'),
-  database=os.getenv('DB_NAME')
-)
-print("Successfully connected to database")
+def connect_to_db():
+    connection_attempts = 0
+    while True:
+        try:
+            mydb = mysql.connector.connect(
+              host=os.getenv('DB_HOST'),
+              user=os.getenv('DB_USER'),
+              password=os.getenv('DB_PASSWORD'),
+              database=os.getenv('DB_NAME')
+            )
+            print("Successfully connected to database")
+            return mydb
+        except mysql.connector.Error as err:
+            connection_attempts += 1
+            print(f"Attempt {connection_attempts}: Failed to connect to database. Error - {str(err)}")
+            time.sleep(5)  # wait for 5 seconds before trying to connect again
+
+mydb = connect_to_db()
 mycursor = mydb.cursor()
+
+# Function to check and re-establish database connection
+async def check_db_connection(mydb):
+    while True:
+        try:
+            mydb.ping()  # checks if the db connection is alive
+        except Exception as e:
+            print(f"Lost connection to database due to {str(e)}, reconnecting...")
+            mydb = connect_to_db()
+        await asyncio.sleep(5)  # the check is performed every 5 seconds
+
+# Schedule the check_db_connection task after the bot is ready
+@bot.event
+async def on_ready():
+    bot.loop.create_task(check_db_connection(mydb))
+
 
 def create_new_run():
     global count
@@ -29,18 +59,22 @@ def create_new_run():
     global end_date
     global status
     global users
+
     count = 0
     starting_date = datetime.now()
     end_date = None
     status = 'running'
     users = ''
-    mycursor.execute("INSERT INTO scores (score, starting_date, users, end_date, status) VALUES (%s, %s, %s, %s, %s)",
-                     (count, starting_date, users, end_date, status))
+
+    mydb.ping(reconnect=True)  # NEW LINE ADDED
+    mycursor.execute("INSERT INTO scores (score, starting_date, users, end_date, status) VALUES (%s, %s, %s, %s, %s), (count, starting_date, users, end_date, status)")
     mydb.commit()
 
 # Attempt to continue an existing run
+mydb.ping(reconnect=True)  # NEW LINE ADDED
 mycursor.execute("SELECT * FROM scores WHERE status != 'finished' LIMIT 1")
 result = mycursor.fetchone()
+
 if result is not None:
     print("Continuing existing run...")
     count = result[0]
@@ -51,6 +85,7 @@ if result is not None:
 else:
     print("Creating a new run...")
     create_new_run()
+
 
 @bot.event
 async def on_message(message):
@@ -68,11 +103,11 @@ async def on_message(message):
                 if str(msg_author) not in users:
                     users += ', ' + str(msg_author)  # Update the users list
                 await message.add_reaction('\u2705')  # Checkmark reaction represents validation
-                print("Count " + str(count) + " reached by " + str(msg_author))
+                print(f"Count {str(count)} reached by {str(msg_author)}")
 
+                mydb.ping(reconnect=True)  # NEW LINE ADDED
                 mycursor.execute("UPDATE scores SET score = %s, users = %s WHERE status = 'running'", (count, users))
                 mydb.commit()
-
             else:
                 if msg_author == message.author:
                     embed = discord.Embed(title="**Error!**", colour=0xFF0000)
@@ -88,9 +123,10 @@ async def on_message(message):
                     print("Count reseted by " + str(message.author) + " due to incorrect sequence.")
                 end_date = datetime.now()
 
-                # Updated line to set end_date to current time when run is finished
+                mydb.ping(reconnect=True)  # NEW LINE ADDED
                 mycursor.execute("UPDATE scores SET status = %s, end_date = %s, shame = %s WHERE status = 'running'", ('finished', end_date, str(message.author)))
                 mydb.commit()
+
                 print("Run finished, creating a new run...")
                 create_new_run()
 
@@ -100,8 +136,10 @@ async def on_message(message):
             pass
     await bot.process_commands(message)
 
+
 @bot.command(name='leaderboard')
 async def leaderboard(ctx):
+    mydb.ping(reconnect=True)  # NEW LINE ADDED
     mycursor.execute("SELECT * FROM scores WHERE status = 'finished' ORDER BY score DESC LIMIT 5")
     top_scores = mycursor.fetchall()
     embed = discord.Embed(title="Top 5 leaderboard", description="Top 5 best runs:", color=0x0080ff)
@@ -122,6 +160,7 @@ async def hallofshame(ctx):
 @bot.command(name='changelog')
 async def changelog(ctx):
     embed = discord.Embed(title="Changelog", description="Changes made in this version:", color=0x0080ff)
+    embed.add_field(name="Version 2.4", value="- Added automatic database reconnection", inline=False)
     embed.add_field(name="Version 2.3", value="- Added Hall of Shame", inline=False)
     embed.add_field(name="Version 2.2", value="- Changed errors messages", inline=False)
     embed.add_field(name="Version 2.1", value="- Bug fixes", inline=False)
