@@ -2,11 +2,16 @@ import asyncio
 import os
 import time
 from datetime import datetime
+from threading import Thread
 
 import discord
 import mysql.connector
 from discord.ext import commands
 from dotenv import load_dotenv
+
+from flask import Flask
+from flask import request, jsonify
+from flask_cors import CORS
 
 intents = discord.Intents.all()
 bot = commands.Bot(command_prefix='!', intents=intents)
@@ -14,7 +19,6 @@ load_dotenv()
 
 count = 0
 msg_author = None
-
 
 # MySQL connection
 def connect_to_db():
@@ -25,7 +29,8 @@ def connect_to_db():
               host=os.getenv('DB_HOST'),
               user=os.getenv('DB_USER'),
               password=os.getenv('DB_PASSWORD'),
-              database=os.getenv('DB_NAME')
+              database=os.getenv('DB_NAME'),
+              port=os.getenv('DB_PORT')  # handling DB_PORT from .env
             )
             print("Successfully connected to database")
             return mydb
@@ -67,7 +72,7 @@ def create_new_run():
     users = ''
 
     mydb.ping(reconnect=True)  # NEW LINE ADDED
-    mycursor.execute("INSERT INTO scores (score, starting_date, users, end_date, status) VALUES (%s, %s, %s, %s, %s), (count, starting_date, users, end_date, status)")
+    mycursor.execute("INSERT INTO scores (score, starting_date, users, end_date, status) VALUES (%s, %s, %s, %s, %s)", (count, starting_date, users, end_date, status))
     mydb.commit()
 
 # Attempt to continue an existing run
@@ -89,14 +94,20 @@ else:
 
 @bot.event
 async def on_message(message):
-    global count
     global msg_author
     global channel_id
     global users
+    global count
     channel_id = os.getenv('CHANNEL_ID')
     if str(message.channel.id) == channel_id:  # replace with your specific channel id
         try:
+            mydb.ping(reconnect=True)  # reconnect to DB if connection was lost
+            mycursor.execute("SELECT score FROM scores WHERE status = 'running'")  # get the count from the DB
+            count = mycursor.fetchone()[0]
+            mydb.commit()
+
             user_count = int(message.content)
+            print("count = ", count, " - usercount = ", user_count)
             if user_count == count + 1 and msg_author != message.author:
                 count += 1
                 msg_author = message.author
@@ -107,6 +118,14 @@ async def on_message(message):
 
                 mydb.ping(reconnect=True)  # NEW LINE ADDED
                 mycursor.execute("UPDATE scores SET score = %s, users = %s WHERE status = 'running'", (count, users))
+                mycursor.execute("SELECT * FROM users WHERE username = %s", (str(msg_author),))
+                user = mycursor.fetchone()
+
+                # If the user exists, increment the money count
+                if user is not None:
+                    mycursor.execute("UPDATE users SET money = money + 1 WHERE username = %s", (str(msg_author),))
+                else:
+                    mycursor.execute("INSERT INTO users (username, money) VALUES (%s, 1)", (str(msg_author),))
                 mydb.commit()
             else:
                 if msg_author == message.author:
@@ -175,9 +194,54 @@ def start_bot():
         raise Exception("BOT_TOKEN is not set in environment variables")
     bot.run(bot_token)
 
+
+app = Flask(__name__)
+
+CORS(app)  # Enable CORS on the Flask app
+
+
+@app.route("/send", methods=["POST"])
+def send_message():
+    jsonPayload = request.get_json()
+    message_to_send = jsonPayload.get('message')
+    channel_id = os.getenv('CHANNEL_ID')  # replace with your channel id
+
+    if message_to_send is None:
+        return jsonify({'status': 'error', 'message': 'No message provided'}), 400
+
+    # get the channel to send message
+    target_channel = bot.get_channel(int(channel_id))
+
+    if target_channel is None:
+        return jsonify({'status': 'error', 'message': 'Invalid Channel ID'}), 400
+
+    # use the bot to send the message to discord channel
+    # we must run message sending in bot.loop
+    future = asyncio.run_coroutine_threadsafe(target_channel.send(message_to_send), bot.loop)
+    try:
+        # Wait for the result with a timeout
+        future.result(timeout=5)
+    except asyncio.TimeoutError:
+        return jsonify({'status': 'error', 'message': 'TimeOut Error in sending message'}), 500
+    except Exception as e:
+        # general exception, can use specific discord exception
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+    return jsonify({'status': 'success', 'message': 'message sent'}), 200
+
 # main function to execute the program
 def main():
-    start_bot()
+    # Create threads for both Flask app and the bot
+    thread1 = Thread(target=app.run, kwargs={'host':'0.0.0.0', 'port':5100})
+    thread2 = Thread(target=start_bot)
+
+    # Start both threads
+    thread1.start()
+    thread2.start()
+
+    # Join both threads to the main thread
+    thread1.join()
+    thread2.join()
+
 
 if __name__ == "__main__":
     main()
