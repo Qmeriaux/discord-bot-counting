@@ -202,7 +202,7 @@ app = Flask(__name__)
 CORS(app)  # Enable CORS on the Flask app
 
 
-@app.route("/send", methods=["POST"])
+@app.route("/bot/send", methods=["POST"])
 def send_message():
     jsonPayload = request.get_json()
     message_to_send = jsonPayload.get('message')
