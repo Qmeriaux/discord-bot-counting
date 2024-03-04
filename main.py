@@ -194,6 +194,7 @@ async def hallofshame(ctx):
 @bot.command(name='changelog')
 async def changelog(ctx):
     embed = discord.Embed(title="Changelog", description="Changes made in this version:", color=0x0080ff)
+    embed.add_field(name="Version 4.0", value="- New scaling system for income\n- Refactored infrastructure for future updates\n- Changed leaderboard display\n- Balanced items prices\n- Added \"Russian Roulette\" item.\n- Fixed overflow issue in the webapp.", inline=False)
     embed.add_field(name="Version 3.0", value="- Added items, shop, webapp, and so many features !", inline=False)
     embed.add_field(name="Version 2.4", value="- Added automatic database reconnection", inline=False)
     embed.add_field(name="Version 2.3", value="- Added Hall of Shame", inline=False)
