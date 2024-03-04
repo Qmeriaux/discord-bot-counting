@@ -194,6 +194,7 @@ async def hallofshame(ctx):
 @bot.command(name='changelog')
 async def changelog(ctx):
     embed = discord.Embed(title="Changelog", description="Changes made in this version:", color=0x0080ff)
+    embed.add_field(name="Version 3.0", value="- Added items, shop, webapp, and so many features !", inline=False)
     embed.add_field(name="Version 2.4", value="- Added automatic database reconnection", inline=False)
     embed.add_field(name="Version 2.3", value="- Added Hall of Shame", inline=False)
     embed.add_field(name="Version 2.2", value="- Changed errors messages", inline=False)
@@ -201,6 +202,7 @@ async def changelog(ctx):
     embed.add_field(name="Version 2.0", value="- Added database connection\n- Added leaderboard", inline=False)
     embed.add_field(name="Version 1.0", value="- Initial release\n- Basic counting system", inline=False)
     await ctx.send(embed=embed)
+    
 
 # function to start the bot
 def start_bot():
@@ -215,7 +217,7 @@ app = Flask(__name__)
 CORS(app)  # Enable CORS on the Flask app
 
 
-@app.route("/send", methods=["POST"])
+@app.route("/bot/send", methods=["POST"])
 def send_message():
     jsonPayload = request.get_json()
     message_to_send = jsonPayload.get('message')
