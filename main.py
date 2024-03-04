@@ -8,6 +8,7 @@ import discord
 import mysql.connector
 from discord.ext import commands
 from dotenv import load_dotenv
+from tabulate import tabulate
 
 from flask import Flask
 from flask import request, jsonify
@@ -121,11 +122,16 @@ async def on_message(message):
                 mycursor.execute("SELECT * FROM users WHERE username = %s", (str(msg_author),))
                 user = mycursor.fetchone()
 
+                # Updated money calculation according to new scoring rule
+                money_gain = (count // 100) + 1
+
                 # If the user exists, increment the money count
                 if user is not None:
-                    mycursor.execute("UPDATE users SET money = money + 1 WHERE username = %s", (str(msg_author),))
+                    mycursor.execute(
+                        "UPDATE users SET money = money + %s, score = score + 1 WHERE username = %s",
+                        (money_gain, str(msg_author),))
                 else:
-                    mycursor.execute("INSERT INTO users (username, money) VALUES (%s, 1)", (str(msg_author),))
+                    mycursor.execute("INSERT INTO users (username, money, score) VALUES (%s, %s, %s)", (str(msg_author), money_gain, 1))
                 mydb.commit()
             else:
                 if msg_author == message.author:
@@ -158,14 +164,23 @@ async def on_message(message):
 
 @bot.command(name='leaderboard')
 async def leaderboard(ctx):
-    mydb.ping(reconnect=True)  # NEW LINE ADDED
+    mydb.ping(reconnect=True)
     mycursor.execute("SELECT * FROM scores WHERE status = 'finished' ORDER BY score DESC LIMIT 5")
     top_scores = mycursor.fetchall()
-    embed = discord.Embed(title="Top 5 leaderboard", description="Top 5 best runs:", color=0x0080ff)
+    # embed = discord.Embed(title="Top 5 leaderboard", description="Top 5 best runs:", color=0x0080ff)
+
+    headers = ["Rank", "Score", "Start Date", "End Date", "Failed By"]
+    data = []
+
     for i, score in enumerate(top_scores, start=1):
-        embed.add_field(name=f"Top {i} : {score[0]}", value=f"Scored `{score[0]}` points starting on `{score[1]}` and ended on `{score[2]}`, participants were `{score[4][2:]}`, failed by `{score[5]}`.", inline=False)
-        embed.set_field_at(i-1, name=f"Top {i} : {score[0]}", value=f"Scored **{score[0]}** points starting on `{score[1]}` and ended on `{score[2]}`, participants were `{score[4][2:]}`, failed by `{score[5]}`.", inline=False)
-    await ctx.send(embed=embed)
+        formatted_start_date = score[1].strftime('%d/%m/%Y %H:%M')
+        formatted_end_date = score[2].strftime('%d/%m/%Y %H:%M') if score[2] else None
+        data.append([i, score[0], formatted_start_date, formatted_end_date, score[5]])
+        table = tabulate(data, headers, tablefmt='pipe')
+        # embed.add_field(name=f"Top {i} : {score[0]}", value=f"Scored `{score[0]}` points starting on `{formatted_start_date}` and ended on `{formatted_end_date}`, participants were `{score[4][2:]}`, failed by `{score[5]}`.", inline=False)
+        # embed.set_field_at(i-1, name=f"Top {i} : {score[0]}", value=f"Scored **{score[0]}** points starting on `{formatted_start_date}` and ended on `{formatted_end_date}`, participants were `{score[4][2:]}`, failed by `{score[5]}`.", inline=False)
+    # await ctx.send(embed=embed)
+    await ctx.send(f"Top 5 leaderboard\n```{table}```")
 
 @bot.command(name='hallofshame')
 async def hallofshame(ctx):
